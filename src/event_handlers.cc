@@ -191,7 +191,7 @@ void OnTick(const Timer::Id &timer_id, const WallClock::Value &clock) {
 			else
 			{
 				response["result"] = false;
-				response["reason"] = music_id + " canot insert";
+				response["reason"] = music_id + " cannot insert";
 			}
 			
 		}
