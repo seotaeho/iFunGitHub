@@ -1,15 +1,21 @@
 {
-  "SessionOpened": {
-    "session_id": "string",
-    "when": "datetime2"
-  },
-  "SessionClosed": {
-    "session_id": "string",
-    "when": "datetime2"
-  },
-  "PlayerLoggedIn": {
-    "session_id": "string",
-    "account_id": "string",
-    "when": "datetime2"
-  }
+    "SessionOpened": {
+        "session_id": "string",
+        "when": "datetime2"
+    },
+    "SessionClosed": {
+        "session_id": "string",
+        "when": "datetime2"
+    },
+    "PlayerLoggedIn": {
+        "session_id": "string",
+        "account_id": "string",
+        "when": "datetime2"
+    },    
+    "PlayerDropItem": {
+    "player_name": "string",
+    "item_name": "string"
+    }
 }
+
+

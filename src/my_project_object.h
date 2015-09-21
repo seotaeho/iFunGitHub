@@ -10,9 +10,10 @@
 #define SRC_MY_PROJECT_OBJECT_H_
 
 #include "object_model/common.h"
+#include "object_model/album.h"
+#include "object_model/pet.h"
 #include "object_model/character.h"
 #include "object_model/user.h"
 #include "object_model/music2.h"
-#include "object_model/pet.h"
 
 #endif  // SRC_MY_PROJECT_OBJECT_H_

@@ -86,6 +86,16 @@ Object::Id ArrayRef<Object::Id>::GetAt(size_t index) const {
 
 
 template <>
+Ptr<Album> ArrayRef<Ptr<Album> >::GetAt(size_t index) const {
+  const Object::Id &object_id = owner_->GetArrayElementObject(attribute_name_, index);
+  if (object_id == Object::kNullId) {
+    return Album::kNullPtr;
+  }
+  return Album::Fetch(object_id);
+}
+
+
+template <>
 Ptr<Pet> ArrayRef<Ptr<Pet> >::GetAt(size_t index) const {
   const Object::Id &object_id = owner_->GetArrayElementObject(attribute_name_, index);
   if (object_id == Object::kNullId) {
@@ -152,6 +162,16 @@ void ArrayRef<string>::SetAt(size_t index, const string &value) {
 template <>
 void ArrayRef<Object::Id>::SetAt(size_t index, const Object::Id &value) {
   owner_->SetArrayElementObject(attribute_name_, index, value);
+}
+
+
+template <>
+void ArrayRef<Ptr<Album> >::SetAt(size_t index, const Ptr<Album> &value) {
+  if (value) {
+    owner_->SetArrayElementObject(attribute_name_, index, value->Id());
+  } else {
+    owner_->SetArrayElementObject(attribute_name_, index, Object::kNullId);
+  }
 }
 
 
@@ -226,6 +246,16 @@ void ArrayRef<Object::Id>::InsertAt(size_t index, const Object::Id &value) {
 
 
 template <>
+void ArrayRef<Ptr<Album> >::InsertAt(size_t index, const Ptr<Album> &value) {
+  if (value) {
+    owner_->InsertArrayElementObject(attribute_name_, index, value->Id());
+  } else {
+    owner_->InsertArrayElementObject(attribute_name_, index, Object::kNullId);
+  }
+}
+
+
+template <>
 void ArrayRef<Ptr<Pet> >::InsertAt(size_t index, const Ptr<Pet> &value) {
   if (value) {
     owner_->InsertArrayElementObject(attribute_name_, index, value->Id());
@@ -296,6 +326,12 @@ Object::Id ArrayRef<Object::Id>::Front() const {
 
 
 template <>
+Ptr<Album> ArrayRef<Ptr<Album> >::Front() const {
+  return GetAt(0);
+}
+
+
+template <>
 Ptr<Pet> ArrayRef<Ptr<Pet> >::Front() const {
   return GetAt(0);
 }
@@ -345,6 +381,12 @@ string ArrayRef<string>::Back() const {
 
 template <>
 Object::Id ArrayRef<Object::Id>::Back() const {
+  return GetAt(Size() - 1);
+}
+
+
+template <>
+Ptr<Album> ArrayRef<Ptr<Album> >::Back() const {
   return GetAt(Size() - 1);
 }
 
@@ -404,6 +446,12 @@ void ArrayRef<Object::Id>::PushFront(const Object::Id &value) {
 
 
 template <>
+void ArrayRef<Ptr<Album> >::PushFront(const Ptr<Album> &value) {
+  InsertAt(0, value);
+}
+
+
+template <>
 void ArrayRef<Ptr<Pet> >::PushFront(const Ptr<Pet> &value) {
   InsertAt(0, value);
 }
@@ -458,6 +506,12 @@ void ArrayRef<Object::Id>::PushBack(const Object::Id &value) {
 
 
 template <>
+void ArrayRef<Ptr<Album> >::PushBack(const Ptr<Album> &value) {
+  InsertAt(Size(), value);
+}
+
+
+template <>
 void ArrayRef<Ptr<Pet> >::PushBack(const Ptr<Pet> &value) {
   InsertAt(Size(), value);
 }
@@ -479,6 +533,14 @@ template <>
 void ArrayRef<Ptr<Music2> >::PushBack(const Ptr<Music2> &value) {
   InsertAt(Size(), value);
 }
+
+
+struct Album::OpaqueData {
+  OpaqueData() {
+  }
+
+  string album_title;
+};
 
 
 struct Pet::OpaqueData {
@@ -523,6 +585,224 @@ struct Music2::OpaqueData {
 
   string music_title;
 };
+
+
+DEFINE_CLASS_PTR(Album);
+
+
+function<bool(const Ptr<Album> &)> Album::MatchByObjectId(const Object::Id &object_id) {
+  function<Object::Id(const Ptr<Album> &)> obj_id_getter = bind(&Album::Id, _1);
+  return bind(&CompareAttribute<Album, Object::Id>, _1, object_id, obj_id_getter, kEqual);
+}
+
+
+function<bool(const Ptr<Album> &)> Album::MatchByAlbumID(const string &albumid, MatchCondition cond) {
+  function<string(const Ptr<Album> &)> attribute_getter = bind(&Album::GetAlbumID, _1);
+  return bind(&CompareAttribute<Album, string>, _1, albumid, attribute_getter, cond);
+}
+
+
+function<bool(const Ptr<Album> &)> Album::MatchByAlbumTitle(const string &album_title, MatchCondition cond) {
+  function<string(const Ptr<Album> &)> attribute_getter = bind(&Album::GetAlbumTitle, _1);
+  return bind(&CompareAttribute<Album, string>, _1, album_title, attribute_getter, cond);
+};
+
+
+void Album::RegisterAlbumIDTrigger(const TriggerCondition &condition, const TriggerAction &action) {
+  Object::RegisterAttributeTrigger("Album", "AlbumID", condition, action);
+}
+
+
+void Album::RegisterAlbumTitleTrigger(const TriggerCondition &condition, const TriggerAction &action) {
+  Object::RegisterAttributeTrigger("Album", "AlbumTitle", condition, action);
+}
+
+
+Ptr<Album::OpaqueData> Album::CreateOpaqueDataFromJson(const Json &json) {
+  if (not json.IsObject()) {
+    LOG(ERROR) << "not object type";
+    return Ptr<OpaqueData>();
+  }
+
+  Ptr<OpaqueData> data(new OpaqueData);
+
+  if (json.HasAttribute("AlbumTitle")) {
+    if (not json["AlbumTitle"].IsString()) {
+      LOG(ERROR) << "wrong 'AlbumTitle' value: type mismatch";
+      return Ptr<OpaqueData>();
+    }
+    data->album_title = json["AlbumTitle"].GetString();
+  }
+  return data;
+}
+
+
+Ptr<Album> Album::Create(const string &albumid) {
+  AttributeValueMap key_params;
+  key_params["AlbumID"].reset(new AttributeValue(albumid));
+
+  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Album"));
+  BOOST_ASSERT(model);
+
+  // try to fetch by same key values.
+  if (FetchByAlbumID(albumid, kReadLock)) {
+    // key value is duplicated.
+    return kNullPtr;
+  }
+
+  Ptr<Object> obj = Object::Create(model, key_params);
+  if (not obj) {
+    // key value is duplicated.
+    return kNullPtr;
+  }
+
+  return Ptr<Album>(new Album(obj));
+}
+
+
+Ptr<Album> Album::Fetch(
+    const Object::Id &id,
+    LockType lock_type) {
+  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Album"));
+  BOOST_ASSERT(model);
+
+  Ptr<Object> obj = Object::Fetch(model, id, lock_type);
+  if (not obj)
+    return kNullPtr;
+
+  return Ptr<Album>(new Album(obj));
+}
+
+
+void Album::Fetch(
+    const std::vector<Object::Id> &ids,
+    std::vector<std::pair<Object::Id, Ptr<Album> > > *result,
+    LockType lock_type) {
+  BOOST_ASSERT(result);
+  BOOST_ASSERT(result->empty());
+
+  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Album"));
+  BOOST_ASSERT(model);
+
+  std::vector<std::pair<Object::Id, Ptr<Object> > > objs;
+  objs.reserve(ids.size());
+  Object::Fetch(model, ids, lock_type, &objs);
+  BOOST_ASSERT(objs.size() == ids.size());
+
+  result->reserve(ids.size());
+  for (size_t i = 0; i < objs.size(); ++i) {
+    Ptr<Album> wrapped_obj;
+    if (objs[i].second)
+      wrapped_obj.reset(new Album(objs[i].second));
+    result->push_back(std::make_pair(objs[i].first, wrapped_obj));
+  }
+
+  BOOST_ASSERT(result->size() == ids.size());
+}
+
+
+Ptr<Album> Album::FetchByAlbumID(const string &value, LockType lock_type) {
+  Ptr<AttributeValue> key_value(new AttributeValue(value));
+  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Album"));
+  BOOST_ASSERT(model);
+
+  Ptr<Object> obj = Object::Fetch(model, "AlbumID",  key_value, lock_type);
+  if (not obj)
+    return kNullPtr;
+
+  return Ptr<Album>(new Album(obj));
+}
+
+
+void Album::FetchByAlbumID(
+    const std::vector<string> &values,
+    std::vector<std::pair<string, Ptr<Album> > > *result,
+    LockType lock_type) {
+  BOOST_ASSERT(result);
+  BOOST_ASSERT(result->empty());
+
+  std::vector<Ptr<AttributeValue> > key_values;
+  key_values.reserve(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    key_values.push_back(Ptr<AttributeValue>(new AttributeValue(values[i])));
+  }
+
+  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Album"));
+  BOOST_ASSERT(model);
+
+  std::vector<std::pair<Ptr<AttributeValue>, Ptr<Object> > > objs;
+  Object::Fetch(model, "AlbumID", key_values, lock_type, &objs);
+  BOOST_ASSERT(objs.size() == key_values.size());
+
+  result->reserve(values.size());
+  for (size_t i = 0; i < objs.size(); ++i) {
+    Ptr<Album> wrapped_obj;
+    if (objs[i].second)
+      wrapped_obj.reset(new Album(objs[i].second));
+    BOOST_ASSERT(AttributeValue(values[i]) == *objs[i].first);
+    result->push_back(std::make_pair(values[i], wrapped_obj));
+  }
+
+  BOOST_ASSERT(result->size() == values.size());
+}
+
+
+bool Album::IsNull() const {
+  return ObjectProxy::IsNull();
+}
+
+
+bool Album::IsFresh() const {
+  return ObjectProxy::IsFresh();
+}
+
+
+bool Album::Refresh() {
+  return ObjectProxy::Refresh();
+}
+
+
+const Object::Id &Album::Id() const {
+  BOOST_ASSERT(object());
+  return object()->id();
+}
+
+
+void Album::Delete() {
+  object()->Delete();
+  BOOST_ASSERT(IsNull());
+}
+
+
+bool Album::PopulateFrom(const Ptr<OpaqueData> &opaque_data) {
+  SetAlbumTitle(opaque_data->album_title);
+  return true;
+}
+
+
+string Album::GetAlbumID() const {
+  BOOST_ASSERT(object());
+  return object()->GetString("AlbumID");
+}
+
+
+void Album::SetAlbumID(const string &value) {
+  BOOST_ASSERT(object());object()->SetString("AlbumID", value);}
+
+
+string Album::GetAlbumTitle() const {
+  BOOST_ASSERT(object());
+  return object()->GetString("AlbumTitle");
+}
+
+
+void Album::SetAlbumTitle(const string &value) {
+  BOOST_ASSERT(object());object()->SetString("AlbumTitle", value);}
+
+
+Album::Album(const Ptr<Object> &object)
+    : ObjectProxy(object) {
+}
 
 
 DEFINE_CLASS_PTR(Pet);
@@ -1501,6 +1781,29 @@ Music2::Music2(const Ptr<Object> &object)
 }
 
 
+void RegisterAlbumModel() {
+  AttributeModelVector attrs;
+
+  attrs.push_back(Ptr<const AttributeModel>(
+      new AttributeModel(
+          "AlbumID", fun::AttributeModel::kString, true , false, false, false)));
+
+  attrs.push_back(Ptr<const AttributeModel>(
+      new AttributeModel(
+          "AlbumTitle", fun::AttributeModel::kString, false, false, false, false)));
+
+  Ptr<const ObjectModel> model(new ObjectModel("Album", attrs));
+  ObjectModel::AddModel(model);
+
+  // Regiters counter.
+  UpdateCounter(
+      "funapi_object_model",
+      "Album",
+      "The number of active Album objects in memory",
+      0);
+}
+
+
 void RegisterPetModel() {
   AttributeModelVector attrs;
 
@@ -1610,6 +1913,7 @@ void RegisterMusic2Model() {
 
 
 void ObjectModelInit() {
+  RegisterAlbumModel();
   RegisterPetModel();
   RegisterCharacterModel();
   RegisterUserModel();
@@ -1635,11 +1939,12 @@ static CsApiHandler *g_handler = NULL;
 
 
 CsApiHandler::CsApiHandler() : schemas_(boost::assign::map_list_of
+    ("Album", "{\"Album\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"AlbumID\", \"key\": true}, {\"type\": \"string\", \"name\": \"AlbumTitle\"}], \"type\": \"object\"}}")
     ("Pet", "{\"Pet\": {\"propertylist\": [{\"type\": \"integer\", \"name\": \"PetLife\"}, {\"type\": \"integer\", \"name\": \"PetCode\"}], \"type\": \"object\"}}")
     ("Character", "{\"Character\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"Name\", \"key\": true}, {\"type\": \"integer\", \"name\": \"Exp\"}, {\"type\": \"integer\", \"name\": \"Level\"}, {\"type\": \"integer\", \"name\": \"Hp\"}, {\"type\": \"integer\", \"name\": \"Mp\"}, {\"type\": \"integer\", \"name\": \"durability\"}], \"type\": \"object\"}}")
     ("User", "{\"User\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"Id\", \"key\": true}, {\"type\": \"object\", \"name\": \"MyCharacter\", \"schema\": \"Character\"}], \"type\": \"object\"}}")
     ("Music2", "{\"Music2\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"MusicID\", \"key\": true}, {\"type\": \"string\", \"name\": \"MusicTitle\"}], \"type\": \"object\"}}").convert_to_container<boost::unordered_map<string, string> >()),
-  getters_(boost::assign::map_list_of("Character", FetchCharacter)("User", FetchUser)("Music2", FetchMusic2).convert_to_container<CsApiHandler::getter_map>())
+  getters_(boost::assign::map_list_of("Album", FetchAlbum)("Character", FetchCharacter)("User", FetchUser)("Music2", FetchMusic2).convert_to_container<CsApiHandler::getter_map>())
 {
 }
 
@@ -1770,6 +2075,13 @@ bool CsApiHandler::GetData(const string& schema_type, const string &key,
 }
 
 
+// Album dumper
+void DumpJson(my_project::Album &obj, Json &out) {
+  out["AlbumID"].SetString(obj.GetAlbumID());
+  out["AlbumTitle"].SetString(obj.GetAlbumTitle());
+}
+
+
 // Pet dumper
 void DumpJson(my_project::Pet &obj, Json &out) {
   out["PetLife"].SetInteger(obj.GetPetLife());
@@ -1807,6 +2119,16 @@ void DumpJson(my_project::Music2 &obj, Json &out) {
 }
 
 
+
+// Album
+bool FetchAlbum(const std::string &key, Json &out) {
+  Ptr<Album> obj = Album::FetchByAlbumID(key);
+
+  if (!obj)
+    return false;
+  DumpJson(*obj, out);
+  return true;
+}
 
 // Character
 bool FetchCharacter(const std::string &key, Json &out) {
@@ -2077,6 +2399,11 @@ bool InitializeCustomerServiceAPI(CsApiHandler *handler) {
   ApiService::RegisterHandler(http::kGet,
                               boost::regex(pattern_history),
                               HandleAccountGetBillingHistory);
+
+  ApiService::RegisterHandler(
+      http::kGet,
+      boost::regex("/v1/data/Album/(?<key>[^/]+)"),
+      boost::bind(HandleDataGet, _1, _2, _3, std::string("Album")));
 
   ApiService::RegisterHandler(
       http::kGet,

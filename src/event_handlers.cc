@@ -194,12 +194,25 @@ void OnTick(const Timer::Id &timer_id, const WallClock::Value &clock) {
 				response["reason"] = music_id + " cannot insert";
 			}
 			
+			Ptr<Album> album = Album::Create(music_id);
+			if (album)
+			{
+				album->SetAlbumTitle(music_title);
+			}
+			else
+			{
+				response["result"] = false;
+				response["reason"] = music_id + " cannot insert";
+			}
+			
 		}
 		else {
 		  // 같은 이름의 캐릭터가 있어서 생성되지 않았습니다.
 			response["result"] = false;
 			response["reason"] = character_name + " already exists";
 		}
+		
+
 
 		session->SendMessage("create_character", response);
 		/*

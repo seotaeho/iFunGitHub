@@ -66,6 +66,18 @@ def initialize(user, password, host, database, zookeeper_hosts, app_name):
   funapi.Zookeeper.initialize(zookeeper_hosts, app_name)
 
 
+object = funapi.ObjectModel('Album')
+attribute = funapi.AttributeModel('AlbumID', 'String', True, False, False, False, False, '')
+object.add_attribute_model(attribute)
+attribute = funapi.AttributeModel('AlbumTitle', 'String', False, False, False, False, False, '')
+object.add_attribute_model(attribute)
+attribute = funapi.AttributeModel('_tag', 'String', False, False, False, False, False, '')
+object.add_attribute_model(attribute)
+funapi.ObjectModel.add_object_model(object)
+del attribute
+del object
+
+
 object = funapi.ObjectModel('Pet')
 attribute = funapi.AttributeModel('PetLife', 'Integer', False, False, False, False, False, '')
 object.add_attribute_model(attribute)
@@ -120,6 +132,64 @@ object.add_attribute_model(attribute)
 funapi.ObjectModel.add_object_model(object)
 del attribute
 del object
+
+
+class Album:
+  @staticmethod
+  def create(AlbumID):
+    model = funapi.ObjectModel.get_object_model('Album')
+    attributes = {}
+    attributes['AlbumID'] = AlbumID
+    obj = funapi.Object.create(model, attributes)
+    return Album(obj)
+
+  @staticmethod
+  def fetch(object_id):
+    if len(object_id) == 16:
+      object_id = binascii.hexlify(object_id)
+    model = funapi.ObjectModel.get_object_model('Album')
+    obj = funapi.Object.fetch(model, object_id)
+    if obj == None:
+      return None
+    return Album(obj)
+
+  @staticmethod
+  def fetch_by_AlbumID(value):
+    model = funapi.ObjectModel.get_object_model('Album')
+    obj = funapi.Object.fetch_by(model, 'AlbumID', value)
+    if obj == None:
+      return None
+    return Album(obj)
+
+  def __init__(self, obj):
+    self.object_ = obj
+
+  def commit(self):
+    self.object_.commit()
+
+  def delete(self):
+    self.object_.delete()
+
+  def get_object_id(self):
+    return self.object_.get_object_id()
+
+  def get_AlbumID(self):
+    return self.object_.get_attribute('AlbumID')
+
+  def set_AlbumID(self, value):
+    self.object_.set_attribute('AlbumID', value)
+
+  def get_AlbumTitle(self):
+    return self.object_.get_attribute('AlbumTitle')
+
+  def set_AlbumTitle(self, value):
+    self.object_.set_attribute('AlbumTitle', value)
+
+  def get__tag(self):
+    return self.object_.get_attribute('_tag')
+
+  def set__tag(self, value):
+    self.object_.set_attribute('_tag', value)
 
 
 class Pet:

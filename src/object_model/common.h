@@ -21,6 +21,7 @@
 
 namespace my_project {
 
+class Album;
 class Pet;
 class Character;
 class User;
@@ -306,6 +307,7 @@ void ObjectModelInit();
 namespace cs_api {
 
 // serialize (database) object as JSON document
+void DumpJson(my_project::Album &obj, Json &out);
 void DumpJson(my_project::Pet &obj, Json &out);
 void DumpJson(my_project::Character &obj, Json &out);
 void DumpJson(my_project::User &obj, Json &out);
@@ -313,6 +315,7 @@ void DumpJson(my_project::Music2 &obj, Json &out);
 
 
 // read database object as JSON document
+bool FetchAlbum(const std::string &key, Json &out);
 bool FetchCharacter(const std::string &key, Json &out);
 bool FetchUser(const std::string &key, Json &out);
 bool FetchMusic2(const std::string &key, Json &out);
